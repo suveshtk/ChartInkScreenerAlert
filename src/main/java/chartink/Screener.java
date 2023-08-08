@@ -11,7 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.apache.http.Header;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -39,17 +42,38 @@ public class Screener {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.ENGLISH);
         String formattedDate = currentDate.format(formatter);
 		
-        String message = "*****" + formattedDate + "******\n";
-        
-        for(int i=0;i<scripsFiltered.size();i++) {
-        	message = message + scripsFiltered.get(i) + "\n";
+        String message = "*********" + formattedDate + "*********\n";
+        String chartInkScrips = "";
+        if(scrips.size() > 0) {
+        	for(int i=0;i<scrips.size();i++) {
+            	chartInkScrips = chartInkScrips + scrips.get(i) + "\n";
+            }
+        } else {
+        	chartInkScrips = "No stocks Found!!";
         }
+        
+        String screenerScrips = "";
+        if(scripsFiltered.size() > 0) {
+        	for(int i=0;i<scripsFiltered.size();i++) {
+            	screenerScrips = screenerScrips + scripsFiltered.get(i) + "\n";
+            }
+        } else {
+        	screenerScrips = "No stocks Found!!";
+        }
+        
+        message = message + "----Chartink---- \n" + chartInkScrips + "\n";
+        message = message + "----Screener---- \n" + screenerScrips + "\n";
+        message = message + "**********************************";
+        
 		System.out.println(message);
 		sendTelegramNotification(apiToken, chatId, message);
 	}
 
-	public static List<String> screenStocks() {
+	public static List<String> screenStocks() throws Exception {
 		String postUrl = "https://chartink.com/screener/process";
+		List<String> details  = getAuthDetails();
+		String csrfToken = details.get(0);
+		String ciSession = details.get(1);
 		List<String> scrips = new ArrayList<>();
 
 		try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
@@ -62,9 +86,8 @@ public class Screener {
 
 			// Set headers
 			httpPost.addHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
-			httpPost.addHeader("x-csrf-token", "s6chsvB0eUj4ERZp0gOLzgp9K4g8EjpoGVgwABfx");
-			httpPost.addHeader("cookie",
-					"_ga=GA1.2.65505146.1678679344; remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d=eyJpdiI6ImIvTmNYQ3drcG9nWDlBb0dXNVFlRWc9PSIsInZhbHVlIjoiTDlGN1BmRlZ5NnhORk4wbWYrSHRKNFZ1eXluL2NIZmxMS1BzMGlBYTl2SGJrWFZtVExGWkpxKzhRQko4VEovczQyZGsySlZrNWQ0anIreVBOMnlvWi9NRldES1VUS3ZpeWpxOENETFgzSW8rQ242UDViZ3FzVHQ5RC9FZ29mQS9ScXQ5NUF1bysrb1BGN3d6OWMwZzhzNVNOWlR0SVNTc04zMWhiWnUrNTlQRFRVOGZLcjd3QWJFeWZMWTUyaThVRzBiZlZtYmdXZENEY09VL2dpaUFDcHI2dk1YK2V1eEJPQ0lkNmM2WEFDdz0iLCJtYWMiOiI1ZWRkNWE0NzVlZWRmZDFjNDc1ZjRlZTkxZjUyNGJiYTA4MGM2MDVkOTVlOGJiYjY4Mzk1ZjY2MzI4YTk3N2I0IiwidGFnIjoiIn0%3D; _gid=GA1.2.480146942.1690814209; _cc_id=e78cbff62fe25250638f8ebd782ab86a; panoramaId_expiry=1691921646617; panoramaId=bd266bdda41d015ebb83008460be4945a70249d849f2f6d2d3723d58887b5a08; panoramaIdType=panoIndiv; cto_bundle=IlxEVl9IVGVHQ1R3OHBqcU41VnNFUjRUdUFtNyUyQmRQRjZrOUhOcExoZW44WmR6TEozRjJZUSUyQkpiSWtXendTU01VSWNaZGxXSktGSVZnNnpsOEJiSmwlMkZGdXlyU21ZTm9pY21lb0FHZjdNd3hkWk1tVE43czhySW9tT0d3c0ZCSFNDMWNLUDZhUjRIMVBpNWQ0a0pOdlElMkIzY01HZW91dmVHTzlnT3JIZGx5ejNCdCUyRnhEbUtWY2RXMWR6STFoZVVRaEFaZ1g5bkF4YllzNkZCOCUyQkRvd2IxYyUyRjBHUkElM0QlM0Q; _ga_7P3KPC3ZPP=GS1.2.1691316832.37.1.1691320338.0.0.0; __gads=ID=fb31112cc3f6e882-22150979f1db00bc:T=1678679344:RT=1691320338:S=ALNI_MaczTxkZYRs6EeK5kv_vzz9AX56Zw; __gpi=UID=00000bd875c006e5:T=1678679344:RT=1691320338:S=ALNI_MbxzDy2tNVeSb-FGcJAt3IPahit4Q; XSRF-TOKEN=eyJpdiI6IjY5ZEhjbmk0bG1vU2l2K2dIVkpYaEE9PSIsInZhbHVlIjoiUzlHa0J3V29nUXhXckRrZk5aY1I0OUxsZDRDV2xSbHM5eHdvcSt1YWFDb2dVcVJZMkwzdWpPajF5cktRaVNXWWVoTG40eklqNVVzWDB3MW1IWE9kZDk4blorbGZiYThhN0swT2dPVFN1OWxqbDU1VTQ1b0l1a2hyRFQxWXJzeGciLCJtYWMiOiJiMDM4Y2Y3Y2E0MWEyNzY2OTI2NDVkODM4ZTE2MDZhZjc5ZjQyZDMxZWRkNjM0M2EzNTA4OGIzYzI4NTkwMGU2IiwidGFnIjoiIn0%3D; ci_session=eyJpdiI6IkR1L05JRDQwblI2R0JsUFkyTXhnb1E9PSIsInZhbHVlIjoiU0pHaEV1U3JWeDBSN1g0T2plNGN4eml6TFhONkxWQXcxV2tFTTcxTmk4WTJ5MUJyTmlGN2RjWUZjc0xFZnhhM0hYTUVCUjh3aU5Ib0VCdDJNeXBrN0dZWUx0ZklQWWYxV1kwODN6WHFhdmRrVExuOXMwUU9uNk9mYXlkcHlOaWYiLCJtYWMiOiIxNmVlNDEzZmVmMTlhNzJmMWQ0MDk1MDAzMGE2M2RiNGZjODA0OWRlMTNmYmRjMjVkNGQyZTdlZjNjNWFkMGEwIiwidGFnIjoiIn0%3D");
+			httpPost.addHeader("x-csrf-token", csrfToken);
+			httpPost.addHeader("cookie", "ci_session="+ciSession);
 
 			try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
 				String responseBody = EntityUtils.toString(response.getEntity());
@@ -115,12 +138,15 @@ public class Screener {
 
 		List<String> scripsFiltered = new ArrayList<>();
 		List<Integer> ignoreRows = new ArrayList<>();
+		ignoreRows.add(1);
 		ignoreRows.add(2);
+		ignoreRows.add(4);
 		ignoreRows.add(5);
 		ignoreRows.add(6);
 		ignoreRows.add(7);
-		ignoreRows.add(12);
 		ignoreRows.add(9);
+		ignoreRows.add(11);
+		ignoreRows.add(12);
 		boolean status = true;
 
 		for (int i = 0; i < scrips.size(); i++) {
@@ -152,10 +178,14 @@ public class Screener {
 									.replaceAll("%", "");
 							String secondLastQuarterValue = columns.get(columns.size() - 2).text().replaceAll(",", "")
 									.replaceAll("%", "");
-
+							
+							lastQuarterValue = lastQuarterValue.equals("") ? "0" : lastQuarterValue ;
+							secondLastQuarterValue = secondLastQuarterValue.equals("") ? "0" : secondLastQuarterValue ;
+							
 							double lastQuarterIntValue = Double.parseDouble(lastQuarterValue);
 							double secondLastQuarterIntValue = Double.parseDouble(secondLastQuarterValue);
 
+							System.out.println(scrips.get(i) + " : " + columns.get(0).text() + " - " + secondLastQuarterValue + " " + lastQuarterIntValue);
 							if (lastQuarterIntValue < secondLastQuarterIntValue || lastQuarterIntValue < 0) {
 								status = false;
 								break;
@@ -175,4 +205,42 @@ public class Screener {
 
 		return scripsFiltered;
 	}
+    
+    public static List<String> getAuthDetails() throws Exception {
+    	List<String> details = new ArrayList<>();
+    	String content;
+        org.apache.http.client.HttpClient client = HttpClients.createDefault();
+        HttpGet request = new HttpGet("https://chartink.com/screener/process");
+
+        HttpResponse response = client.execute(request);
+        
+        String responseBody = EntityUtils.toString(response.getEntity());
+        
+        Document doc = Jsoup.parse(responseBody);
+        Elements metaTags = doc.getElementsByTag("meta");
+
+        for (Element metaTag : metaTags) {
+            String name = metaTag.attr("name");
+            content = metaTag.attr("content");
+
+            if ("csrf-token".equals(name)) {
+                details.add(content);
+                break;
+            }
+        }
+
+        Header[] cookieHeaders = response.getHeaders("Set-Cookie");
+        for (Header header : cookieHeaders) {
+            String[] cookieValues = header.getValue().split(";")[0].split("=");
+            if (cookieValues.length == 2) {
+                String cookieName = cookieValues[0].trim();
+                String cookieValue = cookieValues[1].trim();
+                if(cookieName.equals("ci_session")) {
+                	details.add(cookieValue);
+                }
+            }
+        }
+        
+        return details;
+    }
 }
